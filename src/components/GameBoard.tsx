@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { getAnimalById } from '../data/animals'
+import { SPECIAL_SPACES } from '../data/specialSpaces'
+import type { BoardSpace } from '../game/boardGenerator'
 
 interface GameBoardProps {
   boardLength: number
+  boardSpaces: BoardSpace[]
   playerPosition: number
   aiPosition: number
   playerAnimalId: string
@@ -12,7 +15,7 @@ interface GameBoardProps {
 
 const SPACES_PER_ROW = 10
 
-export function GameBoard({ boardLength, playerPosition, aiPosition, playerAnimalId, aiAnimalId }: GameBoardProps) {
+export function GameBoard({ boardLength, boardSpaces, playerPosition, aiPosition, playerAnimalId, aiAnimalId }: GameBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<HTMLDivElement>(null)
 
@@ -26,14 +29,13 @@ export function GameBoard({ boardLength, playerPosition, aiPosition, playerAnima
       { length: Math.min(SPACES_PER_ROW, boardLength - i) },
       (_, j) => i + j + 1
     )
-    // Reverse every other row for snake pattern
     if (rows.length % 2 === 1) row.reverse()
     rows.push(row)
   }
 
   // Auto-scroll to keep player visible
   useEffect(() => {
-    if (playerRef.current && boardRef.current) {
+    if (playerRef.current) {
       playerRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
@@ -42,13 +44,11 @@ export function GameBoard({ boardLength, playerPosition, aiPosition, playerAnima
     }
   }, [playerPosition])
 
-  // Determine if AI is off-screen and which direction
   const playerRow = Math.floor((playerPosition - 1) / SPACES_PER_ROW)
   const aiRow = Math.floor((aiPosition - 1) / SPACES_PER_ROW)
 
   return (
     <div className="relative">
-      {/* Off-screen AI indicators */}
       <AiOffscreenIndicator
         aiPosition={aiPosition}
         playerPosition={playerPosition}
@@ -72,29 +72,24 @@ export function GameBoard({ boardLength, playerPosition, aiPosition, playerAnima
                 const isBoth = isPlayer && isAi
                 const isFinish = space === boardLength
                 const isStart = space === 1
+                const boardSpace = boardSpaces[space - 1]
+                const specialType = boardSpace?.specialType
+                const specialDef = specialType ? SPECIAL_SPACES[specialType] : null
+
+                let bgClass = 'bg-indigo-800/30 border border-indigo-600/15'
+                if (isFinish) bgClass = 'bg-yellow-500/25 border border-yellow-400/40'
+                else if (isStart) bgClass = 'bg-emerald-500/20 border border-emerald-400/30'
+                else if (specialDef) bgClass = `${specialDef.color} ${specialDef.borderColor} border`
 
                 return (
                   <div
                     key={space}
                     ref={isPlayer ? playerRef : undefined}
                     className={`relative w-9 h-9 rounded-lg flex items-center justify-center text-[10px] font-bold
-                               shrink-0 transition-colors duration-200
-                               ${isFinish
-                                 ? 'bg-yellow-500/25 border border-yellow-400/40'
-                                 : isStart
-                                   ? 'bg-emerald-500/20 border border-emerald-400/30'
-                                   : 'bg-indigo-800/30 border border-indigo-600/15'}`}
+                               shrink-0 transition-colors duration-200 ${bgClass}`}
                   >
-                    {/* Space number (faded background) */}
-                    {!isPlayer && !isAi && !isFinish && (
-                      <span className="text-indigo-600/40">{space}</span>
-                    )}
-                    {!isPlayer && !isAi && isFinish && (
-                      <span className="text-sm">🏁</span>
-                    )}
-
-                    {/* Animal pieces */}
-                    {isBoth && (
+                    {/* Content: animal pieces take priority, then special icons, then space number */}
+                    {isBoth ? (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <motion.img
                           src={playerAnimal?.image}
@@ -111,8 +106,7 @@ export function GameBoard({ boardLength, playerPosition, aiPosition, playerAnima
                           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                         />
                       </div>
-                    )}
-                    {isPlayer && !isBoth && (
+                    ) : isPlayer ? (
                       <motion.img
                         src={playerAnimal?.image}
                         alt=""
@@ -120,8 +114,7 @@ export function GameBoard({ boardLength, playerPosition, aiPosition, playerAnima
                         layoutId="player-piece"
                         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                       />
-                    )}
-                    {isAi && !isBoth && (
+                    ) : isAi ? (
                       <motion.img
                         src={aiAnimal?.image}
                         alt=""
@@ -129,6 +122,12 @@ export function GameBoard({ boardLength, playerPosition, aiPosition, playerAnima
                         layoutId="ai-piece"
                         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                       />
+                    ) : isFinish ? (
+                      <span className="text-sm">🏁</span>
+                    ) : specialDef ? (
+                      <span className="text-sm">{specialDef.icon}</span>
+                    ) : (
+                      <span className="text-indigo-600/40">{space}</span>
                     )}
                   </div>
                 )
@@ -156,7 +155,6 @@ function AiOffscreenIndicator({
   boardLength: number
   aiAnimal: ReturnType<typeof getAnimalById>
 }) {
-  // Only show if AI and player are on different rows
   if (aiRow === playerRow || aiPosition === playerPosition) return null
 
   const isAhead = aiPosition > playerPosition

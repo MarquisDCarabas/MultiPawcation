@@ -40,6 +40,7 @@ export interface GameState {
   playerAnimalId: string
   aiAnimalId: string
   boardLength: number
+  boardSpaces: import('../game/boardGenerator').BoardSpace[]
   playerPosition: number
   aiPosition: number
   currentProblem: Problem | null
@@ -57,6 +58,15 @@ export interface GameState {
   aiTimerActive: boolean
   isPaused: boolean
   problemHistory: ProblemResult[]
+  // Special space effects
+  hasShield: boolean
+  hasBonusSprint: boolean
+  isSkippingTurn: boolean
+  isChallenge: boolean // current problem is a challenge card problem
+  specialMessage: string | null // notification message to display
+  aiHasShield: boolean
+  aiHasBonusSprint: boolean
+  aiIsSkippingTurn: boolean
 }
 
 export interface ProblemResult {
@@ -79,4 +89,5 @@ export type GameAction =
   | { type: 'GO_TO_TITLE' }
   | { type: 'GO_TO_ANIMAL_SELECT' }
   | { type: 'SELECT_ANIMAL'; animalId: string }
+  | { type: 'DISMISS_SPECIAL_MESSAGE' }
   | { type: 'RESUME_GAME'; state: GameState }

@@ -12,6 +12,7 @@ import { HUD } from './components/HUD'
 import { Timer } from './components/Timer'
 import { GameOverScreen } from './components/GameOverScreen'
 import { PauseMenu } from './components/PauseMenu'
+import { SpecialSpaceNotification } from './components/SpecialSpaceNotification'
 
 function App() {
   const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState)
@@ -34,6 +35,26 @@ function App() {
       return () => clearTimeout(timer)
     }
   }, [state.showingResult, state.isCorrect, state.winner])
+
+  // Auto-advance when skipping turn (mud pit)
+  useEffect(() => {
+    if (state.isSkippingTurn && !state.showingResult && !state.winner) {
+      const timer = setTimeout(() => {
+        dispatch({ type: 'CLEAR_RESULT' })
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [state.isSkippingTurn, state.showingResult, state.winner])
+
+  // Auto-dismiss special space messages
+  useEffect(() => {
+    if (state.specialMessage && !state.showingResult) {
+      const timer = setTimeout(() => {
+        dispatch({ type: 'DISMISS_SPECIAL_MESSAGE' })
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [state.specialMessage, state.showingResult])
 
   const handlePause = useCallback(() => {
     dispatch({ type: 'TOGGLE_PAUSE' })
@@ -122,6 +143,7 @@ function App() {
         <div className="px-2 py-1">
           <GameBoard
             boardLength={state.boardLength}
+            boardSpaces={state.boardSpaces}
             playerPosition={state.playerPosition}
             aiPosition={state.aiPosition}
             playerAnimalId={state.playerAnimalId}
@@ -136,14 +158,44 @@ function App() {
 
         {/* Game content (flashcard + numpad) */}
         {!state.isPaused && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4">
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 px-4">
+            {/* Active effects badges */}
+            <div className="flex gap-2 flex-wrap justify-center">
+              {state.hasShield && (
+                <span className="px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/30 text-xs text-sky-300">
+                  🛡️ Shield Active
+                </span>
+              )}
+              {state.hasBonusSprint && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-xs text-amber-300">
+                  ⚡ Bonus Sprint
+                </span>
+              )}
+              {state.isChallenge && (
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-400/30 text-xs text-purple-300">
+                  ⭐ Challenge! +3 if correct
+                </span>
+              )}
+            </div>
+
+            {/* Special space notification */}
+            <SpecialSpaceNotification message={state.specialMessage} />
+
+            {/* Skipping turn display */}
+            {state.isSkippingTurn && !state.showingResult && (
+              <div className="text-center py-4">
+                <div className="text-2xl mb-2">💩</div>
+                <p className="text-orange-300 font-bold">Mud Pit! Skipping turn...</p>
+              </div>
+            )}
+
             {/* Timer */}
-            {!state.showingResult && (
+            {!state.showingResult && !state.isSkippingTurn && (
               <Timer startTime={state.problemStartTime} active={!state.showingResult} />
             )}
 
             {/* Flash card */}
-            {state.currentProblem && (
+            {state.currentProblem && !state.isSkippingTurn && (
               <FlashCard
                 problem={state.currentProblem}
                 isCorrect={state.isCorrect}
@@ -170,11 +222,13 @@ function App() {
             )}
 
             {/* Number pad */}
-            <NumberPad
-              input={state.playerInput}
-              dispatch={dispatch}
-              disabled={state.showingResult}
-            />
+            {!state.isSkippingTurn && (
+              <NumberPad
+                input={state.playerInput}
+                dispatch={dispatch}
+                disabled={state.showingResult}
+              />
+            )}
           </div>
         )}
       </div>
