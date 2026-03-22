@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { gameReducer, createInitialState } from '../gameState'
-import { generateBoard } from '../boardGenerator'
 import type { GameState, GameSettings } from '../types'
 import type { BoardSpace } from '../boardGenerator'
 
@@ -142,9 +141,7 @@ describe('Banana Peel special space', () => {
   })
 
   it('clamps to position 1 near start', () => {
-    const board = boardWithSpecial(20, 5, 'banana_peel')
-    // If somehow landing on position 2 with banana peel (shouldn't happen
-    // since first 3 spaces are normal, but test the clamp logic)
+    // Test the clamp logic with banana peel near start
     const board2 = boardWithSpecial(20, 2, 'banana_peel')
     const state = createTestState({
       playerPosition: 1,
