@@ -2,6 +2,8 @@ import { useReducer, useEffect, useCallback } from 'react'
 import { gameReducer, createInitialState } from './game/gameState'
 import { useAIOpponent } from './hooks/useAIOpponent'
 import { useSaveState, loadSavedState } from './hooks/useSaveState'
+import { usePreloadAssets } from './hooks/usePreloadAssets'
+import { AnimalSelect } from './components/AnimalSelect'
 import { GameSettings } from './components/GameSettings'
 import { GameBoard } from './components/GameBoard'
 import { FlashCard } from './components/FlashCard'
@@ -9,9 +11,12 @@ import { NumberPad } from './components/NumberPad'
 import { HUD } from './components/HUD'
 import { Timer } from './components/Timer'
 import { GameOverScreen } from './components/GameOverScreen'
+import { PauseMenu } from './components/PauseMenu'
 
 function App() {
   const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState)
+
+  const assetsLoaded = usePreloadAssets()
 
   useAIOpponent(state, dispatch)
   useSaveState(state)
@@ -34,6 +39,16 @@ function App() {
     dispatch({ type: 'TOGGLE_PAUSE' })
   }, [])
 
+  // Loading screen
+  if (!assetsLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="text-5xl animate-bounce">🐾</div>
+        <p className="text-indigo-300 text-lg animate-pulse">Loading...</p>
+      </div>
+    )
+  }
+
   // Title screen
   if (state.screen === 'title') {
     return (
@@ -46,7 +61,7 @@ function App() {
 
         <div className="flex flex-col gap-3 mt-4">
           <button
-            onPointerDown={() => dispatch({ type: 'GO_TO_SETTINGS' })}
+            onPointerDown={() => dispatch({ type: 'GO_TO_ANIMAL_SELECT' })}
             className="px-12 py-4 bg-gradient-to-r from-emerald-500 to-teal-500
                        hover:from-emerald-400 hover:to-teal-400
                        active:scale-95 rounded-2xl text-xl font-bold text-white
@@ -75,6 +90,11 @@ function App() {
     return <GameOverScreen state={state} dispatch={dispatch} />
   }
 
+  // Animal select screen
+  if (state.screen === 'animalSelect') {
+    return <AnimalSelect dispatch={dispatch} />
+  }
+
   // Settings screen
   if (state.screen === 'settings') {
     return <GameSettings dispatch={dispatch} />
@@ -94,6 +114,8 @@ function App() {
           playerStreak={state.playerStreak}
           isPaused={state.isPaused}
           onPause={handlePause}
+          playerAnimalId={state.playerAnimalId}
+          aiAnimalId={state.aiAnimalId}
         />
 
         {/* Board */}
@@ -102,24 +124,14 @@ function App() {
             boardLength={state.boardLength}
             playerPosition={state.playerPosition}
             aiPosition={state.aiPosition}
+            playerAnimalId={state.playerAnimalId}
+            aiAnimalId={state.aiAnimalId}
           />
         </div>
 
         {/* Pause overlay */}
         {state.isPaused && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-4xl mb-4">⏸</div>
-              <h2 className="text-2xl font-bold text-indigo-200 mb-4">Paused</h2>
-              <button
-                onPointerDown={handlePause}
-                className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500
-                           text-white font-bold transition-all active:scale-95"
-              >
-                Resume
-              </button>
-            </div>
-          </div>
+          <PauseMenu onResume={handlePause} onQuit={() => dispatch({ type: 'GO_TO_TITLE' })} />
         )}
 
         {/* Game content (flashcard + numpad) */}

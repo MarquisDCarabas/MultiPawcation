@@ -1,3 +1,5 @@
+import { getAnimalById } from '../data/animals'
+
 interface HUDProps {
   playerPosition: number
   aiPosition: number
@@ -7,6 +9,8 @@ interface HUDProps {
   playerStreak: number
   isPaused: boolean
   onPause: () => void
+  playerAnimalId: string
+  aiAnimalId: string
 }
 
 export function HUD({
@@ -18,17 +22,27 @@ export function HUD({
   playerStreak,
   isPaused,
   onPause,
+  playerAnimalId,
+  aiAnimalId,
 }: HUDProps) {
+  const playerAnimal = getAnimalById(playerAnimalId)
+  const aiAnimal = getAnimalById(aiAnimalId)
+
   return (
-    <div className="flex items-center justify-between w-full px-3 py-2 text-sm">
-      <div className="flex gap-3">
+    <div className="flex items-center justify-between w-full px-3 py-2 text-sm
+                    bg-indigo-950/40 border-b border-indigo-700/20">
+      <div className="flex gap-3 items-center">
         <div className="flex items-center gap-1">
-          <span className="text-emerald-400">You:</span>
-          <span className="font-bold">{playerPosition}/{boardLength}</span>
+          {playerAnimal && (
+            <img src={playerAnimal.image} alt="" className="w-6 h-6 object-contain" />
+          )}
+          <span className="font-bold text-emerald-300">{playerPosition}/{boardLength}</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-rose-400">AI:</span>
-          <span className="font-bold">{aiPosition}/{boardLength}</span>
+          {aiAnimal && (
+            <img src={aiAnimal.image} alt="" className="w-5 h-5 object-contain opacity-70" />
+          )}
+          <span className="font-bold text-rose-300">{aiPosition}/{boardLength}</span>
         </div>
       </div>
 

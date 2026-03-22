@@ -1,4 +1,6 @@
+import { motion } from 'framer-motion'
 import type { GameState, GameAction } from '../game/types'
+import { getAnimalById } from '../data/animals'
 
 interface GameOverScreenProps {
   state: GameState
@@ -22,8 +24,26 @@ export function GameOverScreen({ state, dispatch }: GameOverScreenProps) {
 
   return (
     <div className="flex flex-col items-center gap-4 px-4 py-6 h-full overflow-y-auto">
-      {/* Win/Lose header */}
-      <div className="text-6xl mb-2">{isWin ? '🎉' : '😤'}</div>
+      {/* Win/Lose header with animal */}
+      {(() => {
+        const winnerAnimal = getAnimalById(isWin ? state.playerAnimalId : state.aiAnimalId)
+        return (
+          <motion.div
+            initial={{ scale: 0, rotate: -10 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className="relative"
+          >
+            {winnerAnimal && (
+              <img
+                src={winnerAnimal.image}
+                alt=""
+                className={`w-28 h-28 object-contain ${isWin ? 'drop-shadow-[0_0_16px_rgba(52,211,153,0.5)]' : 'drop-shadow-[0_0_16px_rgba(251,113,133,0.4)]'}`}
+              />
+            )}
+          </motion.div>
+        )
+      })()}
       <h1 className={`text-3xl font-bold ${isWin ? 'text-emerald-300' : 'text-rose-300'}`}>
         {isWin ? 'You Won!' : 'AI Wins!'}
       </h1>

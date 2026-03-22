@@ -1,6 +1,6 @@
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type BoardSize = 'quick' | 'standard' | 'marathon'
-export type GameScreen = 'title' | 'settings' | 'playing' | 'gameOver'
+export type GameScreen = 'title' | 'animalSelect' | 'settings' | 'playing' | 'gameOver'
 
 export interface Problem {
   a: number
@@ -37,6 +37,8 @@ export interface GameSettings {
 export interface GameState {
   screen: GameScreen
   settings: GameSettings
+  playerAnimalId: string
+  aiAnimalId: string
   boardLength: number
   playerPosition: number
   aiPosition: number
@@ -75,5 +77,6 @@ export type GameAction =
   | { type: 'SET_AI_TIMER'; active: boolean }
   | { type: 'TOGGLE_PAUSE' }
   | { type: 'GO_TO_TITLE' }
-  | { type: 'GO_TO_SETTINGS' }
+  | { type: 'GO_TO_ANIMAL_SELECT' }
+  | { type: 'SELECT_ANIMAL'; animalId: string }
   | { type: 'RESUME_GAME'; state: GameState }

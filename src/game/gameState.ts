@@ -1,6 +1,7 @@
 import type { GameState, GameAction } from './types'
 import { BOARD_SIZES } from './types'
 import { generateProblem, calculateSpeedBonus } from './problems'
+import { ANIMALS } from '../data/animals'
 
 export function createInitialState(): GameState {
   return {
@@ -10,6 +11,8 @@ export function createInitialState(): GameState {
       difficulty: 'easy',
       numberSets: [2, 3, 4, 5, 6, 7, 8, 9, 10],
     },
+    playerAnimalId: 'cat',
+    aiAnimalId: 'dog',
     boardLength: 35,
     playerPosition: 1,
     aiPosition: 1,
@@ -41,6 +44,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...createInitialState(),
         screen: 'playing',
         settings,
+        playerAnimalId: state.playerAnimalId,
+        aiAnimalId: state.aiAnimalId,
         boardLength,
         currentProblem: problem,
         problemStartTime: Date.now(),
@@ -178,10 +183,22 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return createInitialState()
     }
 
-    case 'GO_TO_SETTINGS': {
+    case 'GO_TO_ANIMAL_SELECT': {
       return {
         ...createInitialState(),
+        screen: 'animalSelect',
+      }
+    }
+
+    case 'SELECT_ANIMAL': {
+      // Pick a random AI animal different from the player's choice
+      const available = ANIMALS.filter((a) => a.id !== action.animalId)
+      const aiAnimal = available[Math.floor(Math.random() * available.length)]
+      return {
+        ...state,
         screen: 'settings',
+        playerAnimalId: action.animalId,
+        aiAnimalId: aiAnimal.id,
       }
     }
 
