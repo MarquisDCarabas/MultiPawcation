@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { Howl, Howler } from 'howler'
 
 const BASE = import.meta.env.BASE_URL
@@ -193,7 +193,8 @@ export function useAudio(): AudioControls {
   } | null>(null)
 
   const musicRef = useRef(new BgMusic())
-  const mutedRef = useRef(localStorage.getItem(MUTE_KEY) === 'true')
+  const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === 'true')
+  const mutedRef = useRef(muted) // sync ref for use in callbacks
   const volumeRef = useRef(parseFloat(localStorage.getItem(VOLUME_KEY) ?? '0.7'))
   const unlockedRef = useRef(false)
 
@@ -255,10 +256,12 @@ export function useAudio(): AudioControls {
   }, [])
 
   const toggleMute = useCallback(() => {
-    mutedRef.current = !mutedRef.current
-    localStorage.setItem(MUTE_KEY, String(mutedRef.current))
-    Howler.volume(mutedRef.current ? 0 : volumeRef.current)
-    if (mutedRef.current) {
+    const newMuted = !mutedRef.current
+    mutedRef.current = newMuted
+    setMuted(newMuted)
+    localStorage.setItem(MUTE_KEY, String(newMuted))
+    Howler.volume(newMuted ? 0 : volumeRef.current)
+    if (newMuted) {
       musicRef.current.stop()
     }
   }, [])
@@ -292,7 +295,7 @@ export function useAudio(): AudioControls {
     startMusic,
     stopMusic,
     setMusicTempo,
-    isMuted: mutedRef.current,
+    isMuted: muted,
     toggleMute,
     volume: volumeRef.current,
     setVolume,
