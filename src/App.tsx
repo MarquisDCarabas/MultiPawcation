@@ -3,6 +3,7 @@ import { gameReducer, createInitialState } from './game/gameState'
 import { useAIOpponent } from './hooks/useAIOpponent'
 import { useSaveState, loadSavedState } from './hooks/useSaveState'
 import { usePreloadAssets } from './hooks/usePreloadAssets'
+import { useAudio } from './hooks/useAudio'
 import {
   loadFactProfile,
   saveFactProfile,
@@ -31,18 +32,101 @@ function App() {
   const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState)
 
   const assetsLoaded = usePreloadAssets()
+  const audio = useAudio()
 
   useAIOpponent(state, dispatch)
   useSaveState(state)
 
-  // Persistent data refs (loaded from localStorage)
+  // Persistent data refs
   const factProfileRef = useRef<FactProfile>(loadFactProfile())
   const progressRef = useRef<ProgressData>(loadProgress())
 
-  // Check for saved game on mount
   const savedState = loadSavedState()
 
-  // Record answers to fact profile when a result is shown
+  // ─── Audio triggers ───
+
+  // Play sound on correct/wrong answer
+  const prevShowingResult = useRef(false)
+  useEffect(() => {
+    if (state.showingResult && !prevShowingResult.current) {
+      if (state.isCorrect) {
+        audio.playCorrect()
+        // Also play speed/mastery bonus sounds
+        const lastResult = state.problemHistory[state.problemHistory.length - 1]
+        if (lastResult?.speedBonus > 0) {
+          setTimeout(() => audio.playSpeedBonus(), 200)
+        }
+      } else {
+        audio.playWrong()
+      }
+    }
+    prevShowingResult.current = state.showingResult
+  }, [state.showingResult, state.isCorrect, state.problemHistory, audio])
+
+  // Play sound on special space landing
+  const prevSpecialMsg = useRef<string | null>(null)
+  useEffect(() => {
+    if (state.specialMessage && state.specialMessage !== prevSpecialMsg.current) {
+      audio.playSpecialSpace()
+    }
+    prevSpecialMsg.current = state.specialMessage
+  }, [state.specialMessage, audio])
+
+  // Play sound on AI movement
+  const prevAiPos = useRef(state.aiPosition)
+  useEffect(() => {
+    if (state.aiPosition !== prevAiPos.current && state.screen === 'playing') {
+      audio.playAiMove()
+    }
+    prevAiPos.current = state.aiPosition
+  }, [state.aiPosition, state.screen, audio])
+
+  // Play victory/defeat on game end
+  const prevWinner = useRef<string | null>(null)
+  useEffect(() => {
+    if (state.winner && !prevWinner.current) {
+      if (state.winner === 'player') {
+        audio.playVictory()
+      } else {
+        audio.playDefeat()
+      }
+      audio.stopMusic()
+    }
+    prevWinner.current = state.winner
+  }, [state.winner, audio])
+
+  // Start/stop background music with gameplay
+  const prevScreen = useRef(state.screen)
+  useEffect(() => {
+    if (state.screen === 'playing' && prevScreen.current !== 'playing') {
+      audio.startMusic()
+    } else if (state.screen !== 'playing' && prevScreen.current === 'playing') {
+      audio.stopMusic()
+    }
+    prevScreen.current = state.screen
+  }, [state.screen, audio])
+
+  // Music tempo shift near finish
+  useEffect(() => {
+    if (state.screen === 'playing') {
+      const nearFinish =
+        state.playerPosition >= state.boardLength - 5 ||
+        state.aiPosition >= state.boardLength - 5
+      audio.setMusicTempo(nearFinish)
+    }
+  }, [state.playerPosition, state.aiPosition, state.boardLength, state.screen, audio])
+
+  // Pause/resume music
+  useEffect(() => {
+    if (state.isPaused) {
+      audio.stopMusic()
+    } else if (state.screen === 'playing' && !state.winner) {
+      audio.startMusic()
+    }
+  }, [state.isPaused, state.screen, state.winner, audio])
+
+  // ─── Fact tracking ───
+
   useEffect(() => {
     if (state.showingResult && state.problemHistory.length > 0) {
       const lastResult = state.problemHistory[state.problemHistory.length - 1]
@@ -56,7 +140,8 @@ function App() {
     }
   }, [state.showingResult, state.problemHistory.length])
 
-  // When game ends (winner set), record result and check unlocks
+  // ─── Game end: record result, check unlocks ───
+
   const gameEndProcessed = useRef(false)
   useEffect(() => {
     if (state.winner && !gameEndProcessed.current) {
@@ -77,62 +162,48 @@ function App() {
     }
   }, [state.winner, state])
 
-  // Auto-advance after showing result
+  // ─── Auto-advance timers ───
+
   useEffect(() => {
     if (state.showingResult && !state.winner) {
       const delay = state.isCorrect ? 800 : 3000
-      const timer = setTimeout(() => {
-        dispatch({ type: 'CLEAR_RESULT' })
-      }, delay)
+      const timer = setTimeout(() => dispatch({ type: 'CLEAR_RESULT' }), delay)
       return () => clearTimeout(timer)
     }
   }, [state.showingResult, state.isCorrect, state.winner])
 
-  // Auto-advance when skipping turn (mud pit)
   useEffect(() => {
     if (state.isSkippingTurn && !state.showingResult && !state.winner) {
-      const timer = setTimeout(() => {
-        dispatch({ type: 'CLEAR_RESULT' })
-      }, 2000)
+      const timer = setTimeout(() => dispatch({ type: 'CLEAR_RESULT' }), 2000)
       return () => clearTimeout(timer)
     }
   }, [state.isSkippingTurn, state.showingResult, state.winner])
 
-  // Auto-dismiss special space messages
   useEffect(() => {
     if (state.specialMessage && !state.showingResult) {
-      const timer = setTimeout(() => {
-        dispatch({ type: 'DISMISS_SPECIAL_MESSAGE' })
-      }, 2000)
+      const timer = setTimeout(() => dispatch({ type: 'DISMISS_SPECIAL_MESSAGE' }), 2000)
       return () => clearTimeout(timer)
     }
   }, [state.specialMessage, state.showingResult])
 
-  // Override problem generation with adaptive learning
-  // When CLEAR_RESULT generates a new problem, replace it with weighted selection
+  // Adaptive learning: replace generated problems with weighted selection
   useEffect(() => {
     if (state.currentProblem && !state.showingResult && state.screen === 'playing' && !state.winner) {
       const profile = factProfileRef.current
       const problem = state.isChallenge
         ? selectChallengeProblem(state.settings.numberSets, profile)
         : selectWeightedProblem(state.settings.numberSets, profile)
-
-      // Only replace if problem differs (to avoid infinite loop)
-      if (
-        problem.a !== state.currentProblem.a ||
-        problem.b !== state.currentProblem.b
-      ) {
+      if (problem.a !== state.currentProblem.a || problem.b !== state.currentProblem.b) {
         dispatch({ type: 'GENERATE_PROBLEM' })
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Only on mount — subsequent problems handled below
-
-  const handlePause = useCallback(() => {
-    dispatch({ type: 'TOGGLE_PAUSE' })
   }, [])
 
-  // Loading screen
+  const handlePause = useCallback(() => dispatch({ type: 'TOGGLE_PAUSE' }), [])
+
+  // ─── Screens ───
+
   if (!assetsLoaded) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -142,7 +213,6 @@ function App() {
     )
   }
 
-  // Title screen
   if (state.screen === 'title') {
     return (
       <div className="flex flex-col items-center justify-center h-full px-4 text-center gap-6">
@@ -154,7 +224,10 @@ function App() {
 
         <div className="flex flex-col gap-3 mt-4">
           <button
-            onPointerDown={() => dispatch({ type: 'GO_TO_ANIMAL_SELECT' })}
+            onPointerDown={() => {
+              audio.unlock() // Safari audio unlock on first interaction
+              dispatch({ type: 'GO_TO_ANIMAL_SELECT' })
+            }}
             className="px-12 py-4 bg-gradient-to-r from-emerald-500 to-teal-500
                        hover:from-emerald-400 hover:to-teal-400
                        active:scale-95 rounded-2xl text-xl font-bold text-white
@@ -165,7 +238,10 @@ function App() {
 
           {savedState && (
             <button
-              onPointerDown={() => dispatch({ type: 'RESUME_GAME', state: savedState })}
+              onPointerDown={() => {
+                audio.unlock()
+                dispatch({ type: 'RESUME_GAME', state: savedState })
+              }}
               className="px-12 py-3 bg-indigo-600 hover:bg-indigo-500
                          active:scale-95 rounded-2xl text-lg font-bold text-white
                          transition-all"
@@ -184,11 +260,21 @@ function App() {
             My Progress
           </button>
         </div>
+
+        {/* Mute toggle on title screen */}
+        <button
+          onPointerDown={() => {
+            audio.unlock()
+            audio.toggleMute()
+          }}
+          className="mt-2 text-sm text-indigo-400 hover:text-indigo-200 transition-colors"
+        >
+          {audio.isMuted ? '🔇 Sound Off' : '🔊 Sound On'}
+        </button>
       </div>
     )
   }
 
-  // Progress screen
   if (state.screen === 'progress') {
     return (
       <ProgressScreen
@@ -199,22 +285,20 @@ function App() {
     )
   }
 
-  // Unlock reveal screen (shown after game end, before scorecard)
   if (state.screen === 'unlockReveal' && state.newUnlocks.length > 0) {
     return (
       <UnlockReveal
         unlockedAnimalIds={state.newUnlocks}
         onContinue={() => dispatch({ type: 'SET_NEW_UNLOCKS', unlocks: [] })}
+        onReveal={() => audio.playUnlock()}
       />
     )
   }
 
-  // Game over screen
   if (state.winner) {
     return <GameOverScreen state={state} dispatch={dispatch} />
   }
 
-  // Animal select screen
   if (state.screen === 'animalSelect') {
     return (
       <AnimalSelect
@@ -224,19 +308,15 @@ function App() {
     )
   }
 
-  // Settings screen
   if (state.screen === 'settings') {
     return <GameSettings dispatch={dispatch} />
   }
 
-  // Playing screen
   if (state.screen === 'playing') {
-    // Check mastery bonus eligibility for current problem
     const masteryEligible = state.currentProblem
       ? isMasteryBonusEligible(factProfileRef.current, state.currentProblem)
       : false
 
-    // Wrap dispatch to inject mastery bonus into SUBMIT_ANSWER
     const playDispatch: typeof dispatch = (action) => {
       if (action.type === 'SUBMIT_ANSWER') {
         dispatch({ ...action, masteryBonus: masteryEligible })
@@ -247,7 +327,6 @@ function App() {
 
     return (
       <div className="flex flex-col h-full">
-        {/* HUD */}
         <HUD
           playerPosition={state.playerPosition}
           aiPosition={state.aiPosition}
@@ -259,9 +338,10 @@ function App() {
           onPause={handlePause}
           playerAnimalId={state.playerAnimalId}
           aiAnimalId={state.aiAnimalId}
+          isMuted={audio.isMuted}
+          onToggleMute={audio.toggleMute}
         />
 
-        {/* Board */}
         <div className="px-2 py-1">
           <GameBoard
             boardLength={state.boardLength}
@@ -273,15 +353,12 @@ function App() {
           />
         </div>
 
-        {/* Pause overlay */}
         {state.isPaused && (
           <PauseMenu onResume={handlePause} onQuit={() => dispatch({ type: 'GO_TO_TITLE' })} />
         )}
 
-        {/* Game content (flashcard + numpad) */}
         {!state.isPaused && (
           <div className="flex-1 flex flex-col items-center justify-center gap-2 px-4">
-            {/* Active effects badges */}
             <div className="flex gap-2 flex-wrap justify-center">
               {state.hasShield && (
                 <span className="px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/30 text-xs text-sky-300">
@@ -305,10 +382,8 @@ function App() {
               )}
             </div>
 
-            {/* Special space notification */}
             <SpecialSpaceNotification message={state.specialMessage} />
 
-            {/* Skipping turn display */}
             {state.isSkippingTurn && !state.showingResult && (
               <div className="text-center py-4">
                 <div className="text-2xl mb-2">💩</div>
@@ -316,12 +391,10 @@ function App() {
               </div>
             )}
 
-            {/* Timer */}
             {!state.showingResult && !state.isSkippingTurn && (
               <Timer startTime={state.problemStartTime} active={!state.showingResult} />
             )}
 
-            {/* Flash card */}
             {state.currentProblem && !state.isSkippingTurn && (
               <FlashCard
                 problem={state.currentProblem}
@@ -331,7 +404,6 @@ function App() {
               />
             )}
 
-            {/* Speed bonus + mastery bonus feedback */}
             {state.showingResult && state.isCorrect && state.problemHistory.length > 0 && (
               <div className="text-center flex flex-col gap-1">
                 {(() => {
@@ -356,7 +428,6 @@ function App() {
               </div>
             )}
 
-            {/* Number pad */}
             {!state.isSkippingTurn && (
               <NumberPad
                 input={state.playerInput}

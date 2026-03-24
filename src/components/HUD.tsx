@@ -11,6 +11,8 @@ interface HUDProps {
   onPause: () => void
   playerAnimalId: string
   aiAnimalId: string
+  isMuted: boolean
+  onToggleMute: () => void
 }
 
 export function HUD({
@@ -24,6 +26,8 @@ export function HUD({
   onPause,
   playerAnimalId,
   aiAnimalId,
+  isMuted,
+  onToggleMute,
 }: HUDProps) {
   const playerAnimal = getAnimalById(playerAnimalId)
   const aiAnimal = getAnimalById(aiAnimalId)
@@ -46,12 +50,19 @@ export function HUD({
         </div>
       </div>
 
-      <div className="flex gap-3 items-center">
+      <div className="flex gap-2 items-center">
         <div className="text-emerald-300">{totalCorrect}✓</div>
         <div className="text-rose-300">{totalWrong}✗</div>
         {playerStreak >= 2 && (
           <div className="text-yellow-300 font-bold">{playerStreak}🔥</div>
         )}
+        <button
+          onPointerDown={onToggleMute}
+          className="w-9 h-9 rounded-lg bg-indigo-700/50 hover:bg-indigo-600/50
+                     flex items-center justify-center text-base"
+        >
+          {isMuted ? '🔇' : '🔊'}
+        </button>
         <button
           onPointerDown={onPause}
           className="w-9 h-9 rounded-lg bg-indigo-700/50 hover:bg-indigo-600/50

@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getAnimalById } from '../data/animals'
 
 interface UnlockRevealProps {
   unlockedAnimalIds: string[]
   onContinue: () => void
+  onReveal?: () => void
 }
 
-export function UnlockReveal({ unlockedAnimalIds, onContinue }: UnlockRevealProps) {
+export function UnlockReveal({ unlockedAnimalIds, onContinue, onReveal }: UnlockRevealProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
+
+  // Play reveal sound on mount and when advancing
+  useEffect(() => {
+    onReveal?.()
+  }, [currentIndex, onReveal])
 
   if (unlockedAnimalIds.length === 0) {
     onContinue()
