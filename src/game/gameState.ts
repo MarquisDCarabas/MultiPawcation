@@ -43,6 +43,8 @@ export function createInitialState(): GameState {
     aiHasShield: false,
     aiHasBonusSprint: false,
     aiIsSkippingTurn: false,
+    masteryBonusEarned: false,
+    newUnlocks: [],
   }
 }
 
@@ -208,6 +210,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (correct) {
         let moveAmount = 1 + speedBonus
+        // Mastery bonus: +1 for correctly answering a previously-missed fact
+        if (action.masteryBonus) {
+          moveAmount += 1
+        }
         // Challenge card: +3 total instead of normal movement
         if (state.isChallenge) {
           moveAmount = 3
@@ -387,8 +393,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'SELECT_ANIMAL': {
-      const available = ANIMALS.filter((a) => a.id !== action.animalId)
-      const aiAnimal = available[Math.floor(Math.random() * available.length)]
+      // AI picks from unlocked animals only, excluding the player's choice
+      const available = ANIMALS.filter(
+        (a) => a.id !== action.animalId && action.unlockedIds.includes(a.id)
+      )
+      const fallback = ANIMALS.filter((a) => a.id !== action.animalId)
+      const pool = available.length > 0 ? available : fallback
+      const aiAnimal = pool[Math.floor(Math.random() * pool.length)]
       return {
         ...state,
         screen: 'settings',
@@ -399,6 +410,25 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'DISMISS_SPECIAL_MESSAGE': {
       return { ...state, specialMessage: null }
+    }
+
+    case 'GO_TO_PROGRESS': {
+      return {
+        ...createInitialState(),
+        screen: 'progress',
+      }
+    }
+
+    case 'SET_NEW_UNLOCKS': {
+      return {
+        ...state,
+        newUnlocks: action.unlocks,
+        screen: action.unlocks.length > 0 ? 'unlockReveal' : state.screen,
+      }
+    }
+
+    case 'SHOW_SCORECARD': {
+      return state // winner is already set; App.tsx handles the screen routing
     }
 
     case 'RESUME_GAME': {

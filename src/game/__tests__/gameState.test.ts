@@ -246,7 +246,7 @@ describe('animal selection', () => {
   it('SELECT_ANIMAL sets player animal and goes to settings', () => {
     let state = createInitialState()
     state = gameReducer(state, { type: 'GO_TO_ANIMAL_SELECT' })
-    state = gameReducer(state, { type: 'SELECT_ANIMAL', animalId: 'frog' })
+    state = gameReducer(state, { type: 'SELECT_ANIMAL', animalId: 'frog', unlockedIds: ['cat', 'dog', 'frog', 'bear'] })
     expect(state.screen).toBe('settings')
     expect(state.playerAnimalId).toBe('frog')
     expect(state.aiAnimalId).not.toBe('frog') // AI picks different animal
@@ -255,7 +255,7 @@ describe('animal selection', () => {
   it('preserves animal selection through START_GAME', () => {
     let state = createInitialState()
     state = gameReducer(state, { type: 'GO_TO_ANIMAL_SELECT' })
-    state = gameReducer(state, { type: 'SELECT_ANIMAL', animalId: 'bear' })
+    state = gameReducer(state, { type: 'SELECT_ANIMAL', animalId: 'bear', unlockedIds: ['cat', 'dog', 'frog', 'bear'] })
     state = gameReducer(state, { type: 'START_GAME', settings: defaultSettings })
     expect(state.playerAnimalId).toBe('bear')
   })

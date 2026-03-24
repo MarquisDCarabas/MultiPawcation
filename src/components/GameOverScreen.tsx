@@ -96,6 +96,26 @@ export function GameOverScreen({ state, dispatch }: GameOverScreenProps) {
         </div>
       )}
 
+      {/* Badges earned this game */}
+      {(() => {
+        const badges: { icon: string; label: string }[] = []
+        if (isWin && accuracy === 100) badges.push({ icon: '💯', label: 'Perfect Round' })
+        if (state.longestStreak >= 10) badges.push({ icon: '🔥', label: `${state.longestStreak} Streak!` })
+        if (isWin && avgTime < 4) badges.push({ icon: '⚡', label: 'Speed Demon' })
+        const speedBonusCount = state.problemHistory.filter(r => r.speedBonus > 0).length
+        if (speedBonusCount >= 5) badges.push({ icon: '🏎️', label: `${speedBonusCount} Speed Bonuses` })
+        if (badges.length === 0) return null
+        return (
+          <div className="flex gap-2 flex-wrap justify-center mt-1">
+            {badges.map((b, i) => (
+              <span key={i} className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-xs text-purple-300 font-semibold">
+                {b.icon} {b.label}
+              </span>
+            ))}
+          </div>
+        )
+      })()}
+
       {/* Action buttons */}
       <div className="flex gap-3 mt-4">
         <button

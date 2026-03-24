@@ -6,24 +6,27 @@ import type { GameAction } from '../game/types'
 
 interface AnimalSelectProps {
   dispatch: React.Dispatch<GameAction>
+  unlockedAnimalIds: string[]
 }
 
-export function AnimalSelect({ dispatch }: AnimalSelectProps) {
+export function AnimalSelect({ dispatch, unlockedAnimalIds }: AnimalSelectProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [tooltipAnimal, setTooltipAnimal] = useState<AnimalDef | null>(null)
 
   const handleAnimalTap = (animal: AnimalDef) => {
-    if (!animal.starter && animal.unlockCondition) {
-      // Show unlock tooltip — but still allow selection for Phase 2 testing
+    const isUnlocked = unlockedAnimalIds.includes(animal.id)
+    if (!isUnlocked) {
+      // Show unlock tooltip, don't select
       setTooltipAnimal(animal)
       setTimeout(() => setTooltipAnimal(null), 2500)
+      return
     }
     setSelectedId(animal.id)
   }
 
   const handleNext = () => {
     if (selectedId) {
-      dispatch({ type: 'SELECT_ANIMAL', animalId: selectedId })
+      dispatch({ type: 'SELECT_ANIMAL', animalId: selectedId, unlockedIds: unlockedAnimalIds })
     }
   }
 
@@ -38,7 +41,7 @@ export function AnimalSelect({ dispatch }: AnimalSelectProps) {
       <div className="grid grid-cols-5 gap-3 w-full max-w-md mb-4">
         {ANIMALS.map((animal) => {
           const isSelected = selectedId === animal.id
-          const isLocked = !animal.starter
+          const isUnlocked = unlockedAnimalIds.includes(animal.id)
 
           return (
             <motion.button
@@ -48,8 +51,7 @@ export function AnimalSelect({ dispatch }: AnimalSelectProps) {
               className={`relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all
                 ${isSelected
                   ? 'bg-indigo-500/60 border-2 border-yellow-400 shadow-lg shadow-yellow-400/20'
-                  : 'bg-indigo-900/40 border-2 border-indigo-700/30 hover:border-indigo-500/50'}
-                ${isLocked ? 'opacity-100' : ''}`}
+                  : 'bg-indigo-900/40 border-2 border-indigo-700/30 hover:border-indigo-500/50'}`}
             >
               {/* Animal image */}
               <div className="relative w-16 h-16 flex items-center justify-center">
@@ -57,10 +59,10 @@ export function AnimalSelect({ dispatch }: AnimalSelectProps) {
                   src={animal.image}
                   alt={animal.name}
                   className={`w-full h-full object-contain
-                    ${isLocked ? 'grayscale brightness-50' : ''}
+                    ${!isUnlocked ? 'grayscale brightness-50' : ''}
                     ${isSelected ? 'drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]' : ''}`}
                 />
-                {isLocked && (
+                {!isUnlocked && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-2xl drop-shadow-lg">🔒</span>
                   </div>
@@ -69,7 +71,7 @@ export function AnimalSelect({ dispatch }: AnimalSelectProps) {
 
               {/* Animal name */}
               <span className={`text-xs font-semibold
-                ${isSelected ? 'text-yellow-300' : isLocked ? 'text-indigo-500' : 'text-indigo-200'}`}>
+                ${isSelected ? 'text-yellow-300' : !isUnlocked ? 'text-indigo-500' : 'text-indigo-200'}`}>
                 {animal.name}
               </span>
             </motion.button>

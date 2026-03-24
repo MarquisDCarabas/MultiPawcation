@@ -1,6 +1,6 @@
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type BoardSize = 'quick' | 'standard' | 'marathon'
-export type GameScreen = 'title' | 'animalSelect' | 'settings' | 'playing' | 'gameOver'
+export type GameScreen = 'title' | 'animalSelect' | 'settings' | 'playing' | 'gameOver' | 'progress' | 'unlockReveal'
 
 export interface Problem {
   a: number
@@ -67,6 +67,8 @@ export interface GameState {
   aiHasShield: boolean
   aiHasBonusSprint: boolean
   aiIsSkippingTurn: boolean
+  masteryBonusEarned: boolean // show mastery bonus feedback for current problem
+  newUnlocks: string[] // animal IDs unlocked after this game
 }
 
 export interface ProblemResult {
@@ -81,13 +83,16 @@ export type GameAction =
   | { type: 'GENERATE_PROBLEM' }
   | { type: 'INPUT_DIGIT'; digit: string }
   | { type: 'DELETE_DIGIT' }
-  | { type: 'SUBMIT_ANSWER' }
+  | { type: 'SUBMIT_ANSWER'; masteryBonus?: boolean }
   | { type: 'CLEAR_RESULT' }
   | { type: 'AI_MOVE'; spaces: number; correct: boolean }
   | { type: 'SET_AI_TIMER'; active: boolean }
   | { type: 'TOGGLE_PAUSE' }
   | { type: 'GO_TO_TITLE' }
   | { type: 'GO_TO_ANIMAL_SELECT' }
-  | { type: 'SELECT_ANIMAL'; animalId: string }
+  | { type: 'SELECT_ANIMAL'; animalId: string; unlockedIds: string[] }
   | { type: 'DISMISS_SPECIAL_MESSAGE' }
+  | { type: 'GO_TO_PROGRESS' }
+  | { type: 'SET_NEW_UNLOCKS'; unlocks: string[] }
+  | { type: 'SHOW_SCORECARD' }
   | { type: 'RESUME_GAME'; state: GameState }
