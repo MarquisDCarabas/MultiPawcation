@@ -507,6 +507,7 @@ function App() {
             aiPosition={state.aiPosition}
             playerAnimalId={state.playerAnimalId}
             aiAnimalId={state.aiAnimalId}
+            boardSize={state.settings.boardSize}
             expressionAnimate={expressionAnimate}
           />
         </div>
