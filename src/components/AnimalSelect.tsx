@@ -55,12 +55,21 @@ export function AnimalSelect({ dispatch, unlockedAnimalIds }: AnimalSelectProps)
             >
               {/* Animal image */}
               <div className="relative w-16 h-16 flex items-center justify-center">
-                <img
+                <motion.img
                   src={animal.image}
                   alt={animal.name}
                   className={`w-full h-full object-contain
                     ${!isUnlocked ? 'grayscale brightness-50' : ''}
                     ${isSelected ? 'drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]' : ''}`}
+                  animate={isUnlocked ? {
+                    y: [0, -3, 0],
+                  } : undefined}
+                  transition={{
+                    duration: 1.5 + (ANIMALS.indexOf(animal) % 3) * 0.3,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                    delay: (ANIMALS.indexOf(animal) % 5) * 0.2,
+                  }}
                 />
                 {!isUnlocked && (
                   <div className="absolute inset-0 flex items-center justify-center">

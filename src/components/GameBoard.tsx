@@ -11,11 +11,12 @@ interface GameBoardProps {
   aiPosition: number
   playerAnimalId: string
   aiAnimalId: string
+  expressionAnimate?: Record<string, number[]>
 }
 
 const SPACES_PER_ROW = 10
 
-export function GameBoard({ boardLength, boardSpaces, playerPosition, aiPosition, playerAnimalId, aiAnimalId }: GameBoardProps) {
+export function GameBoard({ boardLength, boardSpaces, playerPosition, aiPosition, playerAnimalId, aiAnimalId, expressionAnimate }: GameBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<HTMLDivElement>(null)
 
@@ -46,6 +47,9 @@ export function GameBoard({ boardLength, boardSpaces, playerPosition, aiPosition
 
   const playerRow = Math.floor((playerPosition - 1) / SPACES_PER_ROW)
   const aiRow = Math.floor((aiPosition - 1) / SPACES_PER_ROW)
+
+  // Check if expression has meaningful values
+  const hasExpression = expressionAnimate && Object.keys(expressionAnimate).length > 0
 
   return (
     <div className="relative">
@@ -97,6 +101,7 @@ export function GameBoard({ boardLength, boardSpaces, playerPosition, aiPosition
                           className="w-7 h-7 object-contain absolute -translate-x-1"
                           layoutId="player-piece"
                           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                          animate={hasExpression ? expressionAnimate : undefined}
                         />
                         <motion.img
                           src={aiAnimal?.image}
@@ -113,6 +118,7 @@ export function GameBoard({ boardLength, boardSpaces, playerPosition, aiPosition
                         className="w-7 h-7 object-contain"
                         layoutId="player-piece"
                         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                        animate={hasExpression ? expressionAnimate : undefined}
                       />
                     ) : isAi ? (
                       <motion.img

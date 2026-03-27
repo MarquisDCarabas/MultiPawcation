@@ -44,6 +44,12 @@ describe('createDefaultProgress', () => {
     expect(progress.totalWins).toBe(0)
     expect(progress.totalGames).toBe(0)
   })
+
+  it('starts with 0 speed demon badges and 0 mastered facts', () => {
+    const progress = createDefaultProgress()
+    expect(progress.speedDemonBadges).toBe(0)
+    expect(progress.masteredFactsCount).toBe(0)
+  })
 })
 
 describe('recordGameResult', () => {
@@ -75,19 +81,86 @@ describe('recordGameResult', () => {
     expect(progress.gameHistory).toHaveLength(1)
     expect(progress.gameHistory[0].won).toBe(true)
   })
+
+  it('increments speedDemonBadges when avg time < 4s', () => {
+    const fastHistory = Array(10).fill({
+      problem: { a: 3, b: 7, answer: 21 },
+      correct: true,
+      responseTime: 2000,
+      speedBonus: 2,
+    })
+    const state = createWinState({ problemHistory: fastHistory })
+    const { progress } = recordGameResult(createDefaultProgress(), state)
+    expect(progress.speedDemonBadges).toBe(1)
+  })
+
+  it('does not increment speedDemonBadges when avg time >= 4s', () => {
+    const slowHistory = Array(10).fill({
+      problem: { a: 3, b: 7, answer: 21 },
+      correct: true,
+      responseTime: 5000,
+      speedBonus: 0,
+    })
+    const state = createWinState({ problemHistory: slowHistory })
+    const { progress } = recordGameResult(createDefaultProgress(), state)
+    expect(progress.speedDemonBadges).toBe(0)
+  })
+
+  it('updates masteredFactsCount when passed', () => {
+    const state = createWinState()
+    const { progress } = recordGameResult(createDefaultProgress(), state, 15)
+    expect(progress.masteredFactsCount).toBe(15)
+  })
 })
 
 describe('unlock conditions', () => {
-  it('unlocks coyote after 3 wins', () => {
+  it('unlocks puppy after 3 games played', () => {
+    let progress = createDefaultProgress()
+    for (let i = 0; i < 3; i++) {
+      const state = createWinState({ winner: i === 0 ? 'ai' : 'player' })
+      const result = recordGameResult(progress, state)
+      progress = result.progress
+      if (i === 2) {
+        expect(result.newUnlocks).toContain('puppy')
+      }
+    }
+    expect(isAnimalUnlocked(progress, 'puppy')).toBe(true)
+  })
+
+  it('unlocks fox after 3 wins', () => {
     let progress = createDefaultProgress()
     for (let i = 0; i < 3; i++) {
       const result = recordGameResult(progress, createWinState())
       progress = result.progress
       if (i === 2) {
+        expect(result.newUnlocks).toContain('fox')
+      }
+    }
+    expect(isAnimalUnlocked(progress, 'fox')).toBe(true)
+  })
+
+  it('unlocks coyote after 5 wins', () => {
+    let progress = createDefaultProgress()
+    for (let i = 0; i < 5; i++) {
+      const result = recordGameResult(progress, createWinState())
+      progress = result.progress
+      if (i === 4) {
         expect(result.newUnlocks).toContain('coyote')
       }
     }
     expect(isAnimalUnlocked(progress, 'coyote')).toBe(true)
+  })
+
+  it('unlocks bunny with 5+ speed bonuses in a win', () => {
+    const history = Array(10).fill(null).map((_, i) => ({
+      problem: { a: 3, b: 7, answer: 21 },
+      correct: true,
+      responseTime: 2000,
+      speedBonus: i < 6 ? 2 : 0,
+    }))
+    const state = createWinState({ problemHistory: history })
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
+    expect(newUnlocks).toContain('bunny')
   })
 
   it('unlocks mouse with perfect round (100% accuracy)', () => {
@@ -100,16 +173,23 @@ describe('unlock conditions', () => {
     expect(newUnlocks).toContain('mouse')
   })
 
-  it('unlocks raccoon with 5+ speed bonuses', () => {
-    const history = Array(10).fill(null).map((_, i) => ({
+  it('unlocks raccoon after 3 speed demon badges', () => {
+    const fastHistory = Array(10).fill({
       problem: { a: 3, b: 7, answer: 21 },
       correct: true,
       responseTime: 2000,
-      speedBonus: i < 6 ? 2 : 0, // 6 speed bonuses
-    }))
-    const state = createWinState({ problemHistory: history })
-    const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
-    expect(newUnlocks).toContain('raccoon')
+      speedBonus: 2,
+    })
+    let progress = createDefaultProgress()
+    for (let i = 0; i < 3; i++) {
+      const state = createWinState({ problemHistory: fastHistory })
+      const result = recordGameResult(progress, state)
+      progress = result.progress
+      if (i === 2) {
+        expect(result.newUnlocks).toContain('raccoon')
+      }
+    }
+    expect(isAnimalUnlocked(progress, 'raccoon')).toBe(true)
   })
 
   it('unlocks ferret with medium difficulty win', () => {
@@ -120,29 +200,110 @@ describe('unlock conditions', () => {
     expect(newUnlocks).toContain('ferret')
   })
 
-  it('unlocks turtle with marathon win', () => {
+  it('unlocks turtle after 10 games played', () => {
+    let progress = createDefaultProgress()
+    for (let i = 0; i < 10; i++) {
+      const state = createWinState({ winner: i % 2 === 0 ? 'player' : 'ai' })
+      const result = recordGameResult(progress, state)
+      progress = result.progress
+      if (i === 9) {
+        expect(result.newUnlocks).toContain('turtle')
+      }
+    }
+    expect(isAnimalUnlocked(progress, 'turtle')).toBe(true)
+  })
+
+  it('unlocks skunk with all number sets selected', () => {
+    const state = createWinState({
+      settings: { boardSize: 'standard', difficulty: 'easy', numberSets: [2, 3, 4, 5, 6, 7, 8, 9, 10] },
+    })
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
+    expect(newUnlocks).toContain('skunk')
+  })
+
+  it('does not unlock skunk with partial number sets', () => {
+    const state = createWinState({
+      settings: { boardSize: 'standard', difficulty: 'easy', numberSets: [2, 3, 5] },
+    })
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
+    expect(newUnlocks).not.toContain('skunk')
+  })
+
+  it('unlocks owl when 10 facts are mastered', () => {
+    const state = createWinState()
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state, 10)
+    expect(newUnlocks).toContain('owl')
+  })
+
+  it('does not unlock owl with fewer than 10 mastered facts', () => {
+    const state = createWinState()
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state, 9)
+    expect(newUnlocks).not.toContain('owl')
+  })
+
+  it('unlocks red-panda with marathon win', () => {
     const state = createWinState({
       settings: { boardSize: 'marathon', difficulty: 'easy', numberSets: [2, 3] },
     })
     const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
-    expect(newUnlocks).toContain('turtle')
+    expect(newUnlocks).toContain('red-panda')
   })
 
-  it('unlocks hyena with hard difficulty win', () => {
+  it('unlocks lizard with hard difficulty win', () => {
     const state = createWinState({
       settings: { boardSize: 'standard', difficulty: 'hard', numberSets: [2, 3] },
+    })
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
+    expect(newUnlocks).toContain('lizard')
+  })
+
+  it('unlocks hyena with marathon on hard difficulty', () => {
+    const state = createWinState({
+      settings: { boardSize: 'marathon', difficulty: 'hard', numberSets: [2, 3] },
     })
     const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
     expect(newUnlocks).toContain('hyena')
   })
 
-  it('does not unlock on loss', () => {
+  it('does not unlock hyena with hard but non-marathon', () => {
     const state = createWinState({
-      winner: 'ai',
       settings: { boardSize: 'standard', difficulty: 'hard', numberSets: [2, 3] },
     })
     const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
     expect(newUnlocks).not.toContain('hyena')
+  })
+
+  it('unlocks penguin with marathon on hard with 90%+ accuracy', () => {
+    const state = createWinState({
+      totalProblems: 10,
+      totalCorrect: 9,
+      totalWrong: 1,
+      settings: { boardSize: 'marathon', difficulty: 'hard', numberSets: [2, 3] },
+    })
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
+    expect(newUnlocks).toContain('penguin')
+  })
+
+  it('does not unlock penguin with marathon hard but low accuracy', () => {
+    const state = createWinState({
+      totalProblems: 10,
+      totalCorrect: 7,
+      totalWrong: 3,
+      settings: { boardSize: 'marathon', difficulty: 'hard', numberSets: [2, 3] },
+    })
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
+    expect(newUnlocks).not.toContain('penguin')
+  })
+
+  it('does not unlock on loss', () => {
+    const state = createWinState({
+      winner: 'ai',
+      settings: { boardSize: 'marathon', difficulty: 'hard', numberSets: [2, 3] },
+    })
+    const { newUnlocks } = recordGameResult(createDefaultProgress(), state)
+    expect(newUnlocks).not.toContain('hyena')
+    expect(newUnlocks).not.toContain('lizard')
+    expect(newUnlocks).not.toContain('red-panda')
   })
 
   it('does not double-unlock', () => {

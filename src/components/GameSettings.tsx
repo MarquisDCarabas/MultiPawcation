@@ -20,7 +20,7 @@ const DIFFICULTY_LABELS: Record<Difficulty, { label: string; desc: string }> = {
 export function GameSettings({ dispatch }: GameSettingsProps) {
   // useState is fine here — this is UI form state, not game state
   const [boardSize, setBoardSize] = useState<BoardSize>('standard')
-  const [difficulty, setDifficulty] = useState<Difficulty>('easy')
+  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [numberSets, setNumberSets] = useState<number[]>([2, 3, 4, 5, 6, 7, 8, 9, 10])
 
   const toggleNumber = (n: number) => {

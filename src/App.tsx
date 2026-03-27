@@ -1,4 +1,5 @@
-import { useReducer, useEffect, useCallback, useRef } from 'react'
+import { useState, useReducer, useEffect, useCallback, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { gameReducer, createInitialState } from './game/gameState'
 import { useAIOpponent } from './hooks/useAIOpponent'
 import { useSaveState, loadSavedState } from './hooks/useSaveState'
@@ -13,8 +14,9 @@ import {
   isMasteryBonusEligible,
 } from './game/adaptiveLearning'
 import type { FactProfile } from './game/adaptiveLearning'
-import { loadProgress, saveProgress, recordGameResult } from './game/unlocks'
+import { loadProgress, saveProgress, recordGameResult, createDefaultProgress } from './game/unlocks'
 import type { ProgressData } from './game/unlocks'
+import { countMasteredFacts } from './game/adaptiveLearning'
 import { AnimalSelect } from './components/AnimalSelect'
 import { GameSettings } from './components/GameSettings'
 import { GameBoard } from './components/GameBoard'
@@ -27,12 +29,19 @@ import { PauseMenu } from './components/PauseMenu'
 import { SpecialSpaceNotification } from './components/SpecialSpaceNotification'
 import { UnlockReveal } from './components/UnlockReveal'
 import { ProgressScreen } from './components/ProgressScreen'
+import { ResetProgress } from './components/ResetProgress'
+import { ProgressMinimap } from './components/ProgressMinimap'
+import { TitleAnimation } from './components/TitleAnimation'
+import { SpecialSpaceEffect } from './components/SpecialSpaceEffect'
+import { useParticles } from './components/ParticleCanvas'
+import type { SpecialSpaceType } from './data/specialSpaces'
 
 function App() {
   const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState)
 
   const assetsLoaded = usePreloadAssets()
   const audio = useAudio()
+  const particles = useParticles()
 
   useAIOpponent(state, dispatch)
   useSaveState(state)
@@ -41,36 +50,106 @@ function App() {
   const factProfileRef = useRef<FactProfile>(loadFactProfile())
   const progressRef = useRef<ProgressData>(loadProgress())
 
+  const [showReset, setShowReset] = useState(false)
   const savedState = loadSavedState()
+
+  // ─── Screen shake ───
+  const [shakeClass, setShakeClass] = useState('')
+
+  // ─── Character expression state ───
+  const [charExpression, setCharExpression] = useState<'idle' | 'happy' | 'sad' | 'speed' | 'hop'>('idle')
+
+  // ─── Special space effect overlay ───
+  const [activeSpecialEffect, setActiveSpecialEffect] = useState<SpecialSpaceType | null>(null)
 
   // ─── Audio triggers ───
 
-  // Play sound on correct/wrong answer
+  // Play sound on correct/wrong answer + trigger particles & expressions
   const prevShowingResult = useRef(false)
   useEffect(() => {
     if (state.showingResult && !prevShowingResult.current) {
       if (state.isCorrect) {
         audio.playCorrect()
-        // Also play speed/mastery bonus sounds
+        setCharExpression('happy')
+
+        // Confetti burst at center of screen
+        particles.confettiBurst(window.innerWidth / 2, window.innerHeight * 0.35)
+
+        // Speed bonus expression
         const lastResult = state.problemHistory[state.problemHistory.length - 1]
         if (lastResult?.speedBonus > 0) {
-          setTimeout(() => audio.playSpeedBonus(), 200)
+          setTimeout(() => {
+            audio.playSpeedBonus()
+            setCharExpression('speed')
+          }, 200)
         }
       } else {
         audio.playWrong()
+        setCharExpression('sad')
+
+        // Screen shake on wrong answer
+        setShakeClass('animate-shake')
+        setTimeout(() => setShakeClass(''), 200)
       }
+
+      // Reset expression after delay
+      const delay = state.isCorrect ? 800 : 2500
+      setTimeout(() => setCharExpression('idle'), delay)
     }
     prevShowingResult.current = state.showingResult
-  }, [state.showingResult, state.isCorrect, state.problemHistory, audio])
+  }, [state.showingResult, state.isCorrect, state.problemHistory, audio, particles])
 
-  // Play sound on special space landing
+  // Player position change - trigger hop + dust
+  const prevPlayerPos = useRef(state.playerPosition)
+  useEffect(() => {
+    if (state.playerPosition !== prevPlayerPos.current && state.screen === 'playing') {
+      setCharExpression('hop')
+      setTimeout(() => setCharExpression('idle'), 400)
+
+      // Dust puff at approximate board area
+      particles.dustPuff(window.innerWidth / 2, 120)
+    }
+    prevPlayerPos.current = state.playerPosition
+  }, [state.playerPosition, state.screen, particles])
+
+  // Play sound on special space landing + trigger special effects & particles
   const prevSpecialMsg = useRef<string | null>(null)
   useEffect(() => {
     if (state.specialMessage && state.specialMessage !== prevSpecialMsg.current) {
       audio.playSpecialSpace()
+
+      // Determine which special space type and trigger effects
+      const cx = window.innerWidth / 2
+      const cy = window.innerHeight * 0.4
+      let spaceType: SpecialSpaceType | null = null
+
+      if (state.specialMessage.includes('⚡')) {
+        spaceType = 'bonus_sprint'
+        particles.lightningFlash(cx, cy)
+      } else if (state.specialMessage.includes('💩')) {
+        spaceType = 'mud_pit'
+        particles.mudSplatter(cx, cy)
+      } else if (state.specialMessage.includes('🌈')) {
+        spaceType = 'shortcut'
+        particles.rainbowArc(cx, cy)
+      } else if (state.specialMessage.includes('🍌')) {
+        spaceType = 'banana_peel'
+        particles.bananaSpin(cx, cy)
+      } else if (state.specialMessage.includes('⭐')) {
+        spaceType = 'challenge_card'
+        particles.sparkleBurst(cx, cy)
+      } else if (state.specialMessage.includes('🛡')) {
+        spaceType = 'shield'
+        particles.shieldShimmer(cx, cy)
+      }
+
+      if (spaceType) {
+        setActiveSpecialEffect(spaceType)
+        setTimeout(() => setActiveSpecialEffect(null), 1200)
+      }
     }
     prevSpecialMsg.current = state.specialMessage
-  }, [state.specialMessage, audio])
+  }, [state.specialMessage, audio, particles])
 
   // Play sound on AI movement
   const prevAiPos = useRef(state.aiPosition)
@@ -87,13 +166,17 @@ function App() {
     if (state.winner && !prevWinner.current) {
       if (state.winner === 'player') {
         audio.playVictory()
+        // Victory confetti explosion
+        particles.confettiBurst(window.innerWidth / 2, window.innerHeight / 3)
+        setTimeout(() => particles.confettiBurst(window.innerWidth * 0.3, window.innerHeight / 4), 300)
+        setTimeout(() => particles.confettiBurst(window.innerWidth * 0.7, window.innerHeight / 4), 500)
       } else {
         audio.playDefeat()
       }
       audio.stopMusic()
     }
     prevWinner.current = state.winner
-  }, [state.winner, audio])
+  }, [state.winner, audio, particles])
 
   // Start/stop background music with gameplay
   const prevScreen = useRef(state.screen)
@@ -146,9 +229,11 @@ function App() {
   useEffect(() => {
     if (state.winner && !gameEndProcessed.current) {
       gameEndProcessed.current = true
+      const mastered = countMasteredFacts(factProfileRef.current)
       const { progress: updated, newUnlocks } = recordGameResult(
         progressRef.current,
         state,
+        mastered,
       )
       progressRef.current = updated
       saveProgress(updated)
@@ -213,16 +298,52 @@ function App() {
     )
   }
 
+  if (state.screen === 'title' && showReset) {
+    return (
+      <ResetProgress
+        onReset={() => {
+          // Clear all localStorage data
+          localStorage.clear()
+          // Restore defaults
+          progressRef.current = createDefaultProgress()
+          factProfileRef.current = { facts: {} }
+          setShowReset(false)
+        }}
+        onCancel={() => setShowReset(false)}
+      />
+    )
+  }
+
   if (state.screen === 'title') {
     return (
       <div className="flex flex-col items-center justify-center h-full px-4 text-center gap-6">
-        <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300 bg-clip-text text-transparent">
+        <motion.h1
+          className="text-5xl font-bold bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300 bg-clip-text text-transparent"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
           MultiPawcation
-        </h1>
-        <p className="text-lg text-indigo-200">Times Tables Race!</p>
-        <div className="text-6xl">🐾</div>
+        </motion.h1>
+        <motion.p
+          className="text-lg text-indigo-200"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          Times Tables Race!
+        </motion.p>
+        <motion.div
+          className="text-6xl"
+          animate={{ rotate: [0, -10, 10, -5, 0], scale: [1, 1.1, 1, 1.05, 1] }}
+          transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+        >
+          🐾
+        </motion.div>
 
-        <div className="flex flex-col gap-3 mt-4">
+        <TitleAnimation />
+
+        <div className="flex flex-col gap-3 mt-2">
           <button
             onPointerDown={() => {
               audio.unlock() // Safari audio unlock on first interaction
@@ -270,6 +391,14 @@ function App() {
           className="mt-2 text-sm text-indigo-400 hover:text-indigo-200 transition-colors"
         >
           {audio.isMuted ? '🔇 Sound Off' : '🔊 Sound On'}
+        </button>
+
+        {/* Reset Progress */}
+        <button
+          onPointerDown={() => setShowReset(true)}
+          className="mt-1 text-xs text-indigo-600 hover:text-red-400 transition-colors"
+        >
+          Reset Progress
         </button>
       </div>
     )
@@ -325,8 +454,27 @@ function App() {
       }
     }
 
+    // Map charExpression to Framer Motion animate props for the player piece
+    const expressionAnimate: Record<string, number[]> | undefined = (() => {
+      switch (charExpression) {
+        case 'happy':
+          return { scale: [1, 1.25, 1], y: [0, -6, 0] } as Record<string, number[]>
+        case 'sad':
+          return { rotate: [0, -5, 5, -3, 3, 0], x: [0, -2, 2, -1, 1, 0] } as Record<string, number[]>
+        case 'speed':
+          return { x: [0, -1, 1, -1, 1, 0], scale: [1, 1.1, 1] } as Record<string, number[]>
+        case 'hop':
+          return { y: [0, -8, 0] } as Record<string, number[]>
+        default:
+          return undefined
+      }
+    })()
+
     return (
-      <div className="flex flex-col h-full">
+      <div className={`flex flex-col h-full ${shakeClass}`}>
+        {/* Special space visual effect overlay */}
+        <SpecialSpaceEffect activeEffect={activeSpecialEffect} />
+
         <HUD
           playerPosition={state.playerPosition}
           aiPosition={state.aiPosition}
@@ -342,6 +490,15 @@ function App() {
           onToggleMute={audio.toggleMute}
         />
 
+        {/* Progress minimap */}
+        <ProgressMinimap
+          playerPosition={state.playerPosition}
+          aiPosition={state.aiPosition}
+          boardLength={state.boardLength}
+          playerAnimalId={state.playerAnimalId}
+          aiAnimalId={state.aiAnimalId}
+        />
+
         <div className="px-2 py-1">
           <GameBoard
             boardLength={state.boardLength}
@@ -350,6 +507,7 @@ function App() {
             aiPosition={state.aiPosition}
             playerAnimalId={state.playerAnimalId}
             aiAnimalId={state.aiAnimalId}
+            expressionAnimate={expressionAnimate}
           />
         </div>
 

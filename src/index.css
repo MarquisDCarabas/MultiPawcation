@@ -24,3 +24,18 @@ button, [role="button"] {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* Screen shake animation for wrong answers */
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  15% { transform: translate(-2px, 1px); }
+  30% { transform: translate(2px, -1px); }
+  45% { transform: translate(-3px, 0); }
+  60% { transform: translate(2px, 1px); }
+  75% { transform: translate(-1px, -1px); }
+  90% { transform: translate(1px, 0); }
+}
+
+.animate-shake {
+  animation: shake 0.2s ease-in-out;
+}

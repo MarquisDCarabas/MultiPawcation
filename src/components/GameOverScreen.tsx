@@ -22,34 +22,129 @@ export function GameOverScreen({ state, dispatch }: GameOverScreenProps) {
 
   const totalSpeedBonus = state.problemHistory.reduce((sum, r) => sum + r.speedBonus, 0)
 
+  const playerAnimal = getAnimalById(state.playerAnimalId)
+  const aiAnimal = getAnimalById(state.aiAnimalId)
+
   return (
     <div className="flex flex-col items-center gap-4 px-4 py-6 h-full overflow-y-auto">
       {/* Win/Lose header with animal */}
-      {(() => {
-        const winnerAnimal = getAnimalById(isWin ? state.playerAnimalId : state.aiAnimalId)
-        return (
-          <motion.div
-            initial={{ scale: 0, rotate: -10 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-            className="relative"
-          >
-            {winnerAnimal && (
-              <img
-                src={winnerAnimal.image}
+      <motion.div
+        initial={{ scale: 0, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+        className="relative"
+      >
+        {isWin ? (
+          // Victory: celebratory dance animation
+          <div className="relative">
+            {playerAnimal && (
+              <motion.img
+                src={playerAnimal.image}
                 alt=""
-                className={`w-28 h-28 object-contain ${isWin ? 'drop-shadow-[0_0_16px_rgba(52,211,153,0.5)]' : 'drop-shadow-[0_0_16px_rgba(251,113,133,0.4)]'}`}
+                className="w-28 h-28 object-contain drop-shadow-[0_0_16px_rgba(52,211,153,0.5)]"
+                animate={{
+                  y: [0, -12, 0, -8, 0],
+                  rotate: [0, -5, 5, -3, 0],
+                  scale: [1, 1.1, 1, 1.05, 1],
+                }}
+                transition={{
+                  duration: 1.2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
               />
             )}
-          </motion.div>
-        )
-      })()}
-      <h1 className={`text-3xl font-bold ${isWin ? 'text-emerald-300' : 'text-rose-300'}`}>
+            {/* Celebration sparkles around winner */}
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-lg"
+                style={{
+                  top: '50%',
+                  left: '50%',
+                }}
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{
+                  opacity: [0, 1, 0],
+                  scale: [0, 1.2, 0],
+                  x: Math.cos((Math.PI * 2 * i) / 6) * 50 - 8,
+                  y: Math.sin((Math.PI * 2 * i) / 6) * 50 - 8,
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                }}
+              >
+                {['✨', '⭐', '🌟', '💫', '✨', '⭐'][i]}
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          // Defeat: encouraging animation - gentle sway with pat
+          <div className="relative">
+            {aiAnimal && (
+              <img
+                src={aiAnimal.image}
+                alt=""
+                className="w-20 h-20 object-contain opacity-60 drop-shadow-[0_0_12px_rgba(251,113,133,0.3)]"
+              />
+            )}
+            {playerAnimal && (
+              <motion.img
+                src={playerAnimal.image}
+                alt=""
+                className="w-28 h-28 object-contain drop-shadow-[0_0_12px_rgba(129,140,248,0.4)]"
+                animate={{
+                  rotate: [-2, 2, -2],
+                  y: [0, -2, 0],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+              />
+            )}
+            {/* Encouraging floating hearts */}
+            {[...Array(3)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-sm"
+                style={{ bottom: '100%', left: `${30 + i * 20}%` }}
+                animate={{
+                  y: [0, -20, -40],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  delay: i * 0.6,
+                }}
+              >
+                💪
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      <motion.h1
+        className={`text-3xl font-bold ${isWin ? 'text-emerald-300' : 'text-rose-300'}`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
         {isWin ? 'You Won!' : 'AI Wins!'}
-      </h1>
-      <p className="text-indigo-300 text-sm">
-        {isWin ? 'Great job!' : 'Better luck next time!'}
-      </p>
+      </motion.h1>
+      <motion.p
+        className="text-indigo-300 text-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+      >
+        {isWin ? 'Great job!' : "You're getting better every time!"}
+      </motion.p>
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3 w-full max-w-sm mt-2">
@@ -108,9 +203,15 @@ export function GameOverScreen({ state, dispatch }: GameOverScreenProps) {
         return (
           <div className="flex gap-2 flex-wrap justify-center mt-1">
             {badges.map((b, i) => (
-              <span key={i} className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-xs text-purple-300 font-semibold">
+              <motion.span
+                key={i}
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.8 + i * 0.15, type: 'spring' }}
+                className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-xs text-purple-300 font-semibold"
+              >
                 {b.icon} {b.label}
-              </span>
+              </motion.span>
             ))}
           </div>
         )
