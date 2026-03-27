@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { SPECIAL_SPACES } from '../../data/specialSpaces'
 import type { SpecialSpaceType } from '../../data/specialSpaces'
 import { ANIMALS } from '../../data/animals'
@@ -67,9 +67,9 @@ describe('character expression animations', () => {
       hop: { y: [0, -8, 0] },
     }
 
-    for (const [name, anim] of Object.entries(expressions)) {
+    for (const [, anim] of Object.entries(expressions)) {
       // All values should be number arrays
-      for (const [prop, values] of Object.entries(anim)) {
+      for (const [, values] of Object.entries(anim)) {
         expect(Array.isArray(values)).toBe(true)
         for (const v of values) {
           expect(typeof v).toBe('number')
